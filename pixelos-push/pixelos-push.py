@@ -24,16 +24,16 @@ def push(args):
         command += ' -f'
 
     username = subprocess.check_output(
-        ["git", "config", "review.review.lineageos.org.username"]).decode("utf-8").strip()
+        ["git", "config", "review.review.pixelos.net.username"]).decode("utf-8").strip()
     remotes = subprocess.check_output(
         ["git", "remote", "-v"]).decode("utf-8").strip()
-    if "github.com/LineageOS" in remotes or "git@github.com:LineageOS" in remotes:
-        repo = re.search(r'LineageOS\S+', remotes).group(0)
+    if "github.com/PixelOS-AOSP" in remotes or "git@github.com:PixelOS-AOSP" in remotes:
+        repo = re.search(r'PixelOS-AOSP\S+', remotes).group(0)
     elif "android.googlesource.com" in remotes:
         repo = re.search(r'platform\S+', remotes).group(0)
-        repo = repo.replace("/", "_").replace("platform", "LineageOS/android")
+        repo = repo.replace("/", "_").replace("platform", "PixelOS-AOSP/android_manifest")
 
-    command += ' ssh://{}@review.lineageos.org:29418/{}'.format(
+    command += ' ssh://{}@review.pixelos.net:29418/{}'.format(
         username, repo)
     command += ' HEAD:'
 

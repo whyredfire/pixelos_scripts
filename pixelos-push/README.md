@@ -1,7 +1,7 @@
-# LineageOS Push Script
+# PixelOS Push Script
 
 ```
-usage: lineage-push.py [-h] [-a] [-b] [-d] [-e] [-f] [-l LABEL] [-m [MESSAGE]]
+usage: pixelos-push.py [-h] [-a] [-b] [-d] [-e] [-f] [-l LABEL] [-m [MESSAGE]]
                        [-p [PRIVATE]] [-r REF] [-s] [-t TOPIC] [-w [WIP]]
                        branch
 
@@ -32,6 +32,6 @@ optional arguments:
 ```
 ```
   Examples:
-    lineage-push -d -t test cm-14.1
-    lineage-push -s -l "Code-Review+2,Verified+1" cm-14.1
+    pixelos-push -d -t test cm-14.1
+    pixelos-push -s -l "Code-Review+2,Verified+1" cm-14.1
 ```
