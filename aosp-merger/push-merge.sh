@@ -7,7 +7,7 @@
 #
 
 usage() {
-    echo "Usage ${0} -b <branch-suffix> --pixel"
+    echo "Usage ${0} -b <branch-suffix>"
 }
 
 # Verify argument count
@@ -16,15 +16,10 @@ if [ "${#}" -eq 0 ]; then
     exit 1
 fi
 
-PIXEL=false
-
 while [ "${#}" -gt 0 ]; do
     case "${1}" in
         -b | --branch-suffix )
                 BRANCHSUFFIX="${2}"; shift
-                ;;
-        -p | --pixel )
-                PIXEL=true; shift
                 ;;
         * )
                 usage
@@ -49,10 +44,7 @@ source "${TOP}/build/envsetup.sh"
 # List of merged repos
 PROJECTPATHS=$(cat ${MERGEDREPOS} | grep -w merge | awk '{printf "%s\n", $2}')
 
-echo -e "\n#### Staging branch = ${STAGINGBRANCH} ####"
-
 # Make sure manifest and forked repos are in a consistent state
-echo -e "\n#### Verifying there are no uncommitted changes on forked AOSP projects ####"
 for PROJECTPATH in ${PROJECTPATHS} .repo/manifests; do
     cd "${TOP}/${PROJECTPATH}"
     if [[ -n "$(git status --porcelain)" ]]; then
@@ -60,7 +52,6 @@ for PROJECTPATH in ${PROJECTPATHS} .repo/manifests; do
         exit 1
     fi
 done
-echo "#### Verification complete - no uncommitted changes found ####"
 
 echo -e "\n#### $(basename ${MERGEDREPOS}) ####"
 read -p "Pushing ${STAGINGBRANCH}. Press enter to confirm."
@@ -69,13 +60,9 @@ read -p "Pushing ${STAGINGBRANCH}. Press enter to confirm."
 for PROJECTPATH in ${PROJECTPATHS}; do
     cd "${TOP}/${PROJECTPATH}"
 
-    if [ "${PIXEL}" = true ]; then
-        BRANCH="${device_branch}"
-    else
-        BRANCH=$(git config --get branch.${STAGINGBRANCH}.merge | sed 's|refs/heads/||')
-        if [ -z "${BRANCH}" ]; then
-            BRANCH="${os_branch}"
-        fi
+    BRANCH=$(git config --get branch.${STAGINGBRANCH}.merge | sed 's|refs/heads/||')
+    if [ -z "${BRANCH}" ]; then
+        BRANCH="${os_branch}"
     fi
 
     echo -e "\n#### Submitting ${PROJECTPATH} merge ####"
