@@ -76,7 +76,13 @@ def p_value(p):
     | object
     | function_call
     | IDENT"""
-    if p[1] == 'true':
+    if len(p) == 4:
+        p[0] = {
+            'kind': 'add',
+            'lhs': p[1],
+            'rhs': p[3],
+        }
+    elif p[1] == 'true':
         p[0] = True
     elif p[1] == 'false':
         p[0] = False
@@ -86,7 +92,11 @@ def p_value(p):
 
 def p_function_call(p):
     """function_call : IDENT LPAREN items_opt RPAREN"""
-    p[0] = {'function': p[1], 'args': p[3]}
+    p[0] = {
+        'kind': 'call',
+        'name': p[1],
+        'args': p[3],
+    }
 
 
 def p_array(p):

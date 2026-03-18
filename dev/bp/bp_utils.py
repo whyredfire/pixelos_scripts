@@ -3,7 +3,10 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Dict, List, Optional
+
+from bp.bp_module import BpModule
 
 ANDROID_BP_NAME = 'Android.bp'
 ANDROID_BP_COPYRIGHT = """
@@ -14,7 +17,7 @@ ANDROID_BP_COPYRIGHT = """
 """.lstrip()
 
 
-def merge_bp_module_defaults(base: Dict, override: Dict) -> Dict:
+def merge_bp_module_defaults(base: BpModule, override: BpModule):
     result = base.copy()
 
     for key, value in override.items():
@@ -31,10 +34,12 @@ def merge_bp_module_defaults(base: Dict, override: Dict) -> Dict:
 
 
 def bp_extend_defaults(
-    module: Dict, defaults: List[str], defaults_map: Dict[str, Dict]
+    module: BpModule,
+    defaults: List[str],
+    defaults_map: Dict[str, BpModule],
 ):
     base = None
-    missing_defaults = []
+    missing_defaults: List[str] = []
 
     for default_name in defaults:
         if default_name not in defaults_map:
@@ -55,38 +60,68 @@ def bp_extend_defaults(
     return merge_bp_module_defaults(base, module), missing_defaults
 
 
+SPECIFIC_PARTITIONS = {
+    'vendor': 'vendor',
+    'device_specific': 'odm',
+    'product_specific': 'product',
+    'system_ext_specific': 'system_ext',
+    'oem_specific': 'oem',
+}
+
+PRIORITY_PARTITIONS = [
+    'system',
+    'vendor',
+    'odm',
+    'oem',
+    'product',
+    'system_ext',
+]
+
+
 def get_partition_specific(partition: Optional[str]):
-    if partition == 'product' or partition == 'system_ext':
-        return f'{partition}_specific'
-    elif partition == 'odm':
-        return 'device_specific'
-    elif partition == 'vendor':
-        return partition
+    for s, p in SPECIFIC_PARTITIONS.items():
+        if partition == p:
+            return s
 
     return None
 
 
-def write_android_bp(apk_path: str, android_bp_path: str, package: str):
-    apk_path_parts = apk_path.split('/')
+def get_module_partition(module: BpModule):
+    for s, p in SPECIFIC_PARTITIONS.items():
+        if s in module:
+            return p
 
-    partition = None
-    try:
-        overlay_index = apk_path_parts.index('overlay')
-        partition = apk_path_parts[overlay_index - 1]
-    except (ValueError, IndexError):
-        pass
+    return 'system'
+
+
+def partition_to_priority(partition: str):
+    return PRIORITY_PARTITIONS.index(partition)
+
+
+def write_android_bp(
+    android_bp_path: Path,
+    name: str,
+    aapt_raw: bool,
+    partition: Optional[str] = None,
+):
+    extra = ''
 
     specific = get_partition_specific(partition)
-    if specific is None:
-        specific = ''
-    else:
-        specific = f'\n    {specific}: true,'
+    if specific is not None:
+        extra += f'\n    {specific}: true,'
 
-    with open(android_bp_path, 'w') as o:
-        o.write(
-            f'''{ANDROID_BP_COPYRIGHT}
+    if aapt_raw:
+        extra += '\n    aaptflags: ["--keep-raw-values"],'
+
+    text = f'''
+//
+// SPDX-FileCopyrightText: The LineageOS Project
+// SPDX-License-Identifier: Apache-2.0
+//
+
 runtime_resource_overlay {{
-    name: "{package}",{specific}
+    name: "{name}",{extra}
 }}
-'''
-        )
+'''.lstrip()
+
+    android_bp_path.write_text(text)

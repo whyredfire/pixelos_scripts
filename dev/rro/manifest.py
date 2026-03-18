@@ -3,12 +3,14 @@
 
 from __future__ import annotations
 
-from os import path
+from pathlib import Path
 from typing import Dict, Optional
 
 from lxml import etree
 
 from utils.xml_utils import XML_COMMENT
+
+ElementTree = etree._ElementTree  # type: ignore
 
 NAMESPACE_NAME = 'android'
 NAMESPACE = 'http://schemas.android.com/apk/res/android'
@@ -33,22 +35,26 @@ def namespace_attr(attr: str):
 def parse_package_manifest(manifest_path: str):
     tree = etree.parse(manifest_path)
     root = tree.getroot()
+    package_name = root.attrib.get(PACKAGE_KEY)
+    if package_name is None:
+        return None
 
-    return root.attrib.get(PACKAGE_KEY)
+    assert isinstance(package_name, str)
+    return package_name
 
 
-def parse_overlay_manifest(manifest_path: str):
-    tree = etree.parse(manifest_path)
+def parse_overlay_manifest(tree: ElementTree):
     root = tree.getroot()
 
     package = root.attrib.get(PACKAGE_KEY)
-    assert package is not None
+    assert isinstance(package, str)
 
     overlay_elem = root.find(OVERLAY_TAG)
     assert overlay_elem is not None
 
     namespaced_attr = namespace_attr(TARGET_PACKAGE_KEY)
     target_package = overlay_elem.attrib.get(namespaced_attr)
+    assert isinstance(target_package, str)
 
     overlay_attrs: Dict[str, str] = {}
 
@@ -61,34 +67,17 @@ def parse_overlay_manifest(manifest_path: str):
     return package, target_package, overlay_attrs
 
 
-def _read_prefix_before_tag(xml_path: str, tag: str) -> Optional[bytes]:
-    if not path.exists(xml_path):
-        return None
-
-    try:
-        with open(xml_path, 'rb') as f:
-            data = f.read()
-    except Exception:
-        return None
-
-    needle = b'<' + tag.encode('utf-8')
-    idx = data.find(needle)
-    if idx == -1:
-        return None
-
-    return data[:idx]
-
-
 def write_manifest(
     output_path: str,
+    manifest_name: str,
     package: str,
     target_package: str,
     overlay_attrs: Dict[str, str],
-    maintain_copyrights: bool = False,
+    preserved_prefixes: Optional[Dict[str, bytes]],
 ):
     prefix = None
-    if maintain_copyrights:
-        prefix = _read_prefix_before_tag(output_path, 'manifest')
+    if preserved_prefixes:
+        prefix = preserved_prefixes.get(manifest_name)
 
     body_lines: list[str] = []
     body_lines.append(f'<manifest xmlns:{NAMESPACE_NAME}="{NAMESPACE}"\n')
@@ -106,7 +95,8 @@ def write_manifest(
     body_lines.append('</manifest>\n')
     body = ''.join(body_lines).encode('utf-8')
 
-    with open(output_path, 'wb') as o:
+    manifest_path = Path(output_path, manifest_name)
+    with open(manifest_path, 'wb') as o:
         if prefix is not None:
             o.write(prefix)
         else:
