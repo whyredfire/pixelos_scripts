@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# SPDX-FileCopyrightText: 2024 The LineageOS Project
+# SPDX-FileCopyrightText: The LineageOS Project
 # SPDX-License-Identifier: Apache-2.0
 
 # Generate Android.bp
@@ -15,6 +15,9 @@ for key in $(grep -o :\.\*override keys.mk | sort -u); do
 done
 
 # Generate keys
+./make_key.sh avb 4096
+../../../external/avb/avbtool.py extract_public_key --key avb.pk8 --output avb_custom_key.bin
+
 for key in ../../../build/make/target/product/security/*.pk8; do
     ./make_key.sh $(basename $key .pk8)
 done

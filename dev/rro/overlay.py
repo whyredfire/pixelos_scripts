@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2026 The LineageOS Project
+# SPDX-FileCopyrightText: The LineageOS Project
 # SPDX-License-Identifier: Apache-2.0
 
 from __future__ import annotations
@@ -353,6 +353,7 @@ def parse_overlay_from_android_bp(
         parse_all_values=True,
         read_raw_resources=True,
         track_index=track_index,
+        remove_translatable=True,
         # Dir names to parse, we are parsing an overlay here so we do not want
         # to limit these
         dir_names=None,
@@ -368,6 +369,7 @@ def parse_overlay_from_android_bp(
         preserved_prefixes = read_xml_resources_prefix(
             resources,
             str(overlay_path),
+            resources_dir,
             extra_paths=[manifest],
         )
 
@@ -543,7 +545,7 @@ def is_overlay_aosp(
             print(resource)
     print()
 
-    return (False,)
+    return False
 
 
 def remove_overlay_resources(

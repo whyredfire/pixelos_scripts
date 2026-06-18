@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2025 The LineageOS Project
+# SPDX-FileCopyrightText: The LineageOS Project
 # SPDX-License-Identifier: Apache-2.0
 
 from __future__ import annotations
@@ -132,12 +132,20 @@ PSEUDOLOCALES = (
 )
 
 
+TRANLATABLE_TAGS = {
+    'string',
+    'string-array',
+    'plurals',
+}
+
+
 def parse_xml_resources(
     res_dir: str,
     dir_name: str,
     file_name: str,
     is_default: bool,
     track_index: bool,
+    remove_translatable: bool,
     data: bytes,
     resources: Set[Resource],
     resource_names: Optional[FrozenSet[str]],
@@ -146,6 +154,8 @@ def parse_xml_resources(
 
     if root.tag != RESOURCES_TAG:
         return None
+
+    etree.cleanup_namespaces(root)
 
     comments: List[Comment] = []
     prev_was_comment = False
@@ -190,9 +200,6 @@ def parse_xml_resources(
         feature_flag = node.attrib.get(FEATURE_FLAG_KEY, '')
 
         if node.text is not None:
-            # TODO: this is just a hack for wrong @*
-            node.text = node.text.replace('@*', '@')
-
             if tag == DIMEN_TAG:
                 node.text = normalize_node_text_dimens_units(node.text)
 
@@ -202,7 +209,8 @@ def parse_xml_resources(
         # Overlays don't have translatable=false, remove it to fix
         # equality check
         if TRANSLATABLE_KEY in node.attrib:
-            del node.attrib[TRANSLATABLE_KEY]
+            if remove_translatable or tag not in TRANLATABLE_TAGS:
+                del node.attrib[TRANSLATABLE_KEY]
 
         if MSGID_KEY in node.attrib:
             del node.attrib[MSGID_KEY]
@@ -245,6 +253,7 @@ def parse_package_resources_dir(
     parse_all_values: bool,
     read_raw_resources: bool,
     track_index: bool,
+    remove_translatable: bool,
     dir_names: Optional[FrozenDict[str, FrozenSet[str]]],
 ):
     resources: Set[Resource] = set()
@@ -305,6 +314,7 @@ def parse_package_resources_dir(
                     file_name=file_name,
                     is_default=is_default,
                     track_index=track_index,
+                    remove_translatable=remove_translatable,
                     data=data,
                     resources=resources,
                     resource_names=resource_names,
@@ -333,6 +343,7 @@ def parse_resources(
     parse_all_values: bool,
     read_raw_resources: bool,
     track_index: bool,
+    remove_translatable: bool,
     dir_names: Optional[FrozenDict[str, FrozenSet[str]]],
 ):
     for resources_path in resources_paths:
@@ -341,6 +352,7 @@ def parse_resources(
             parse_all_values=parse_all_values,
             read_raw_resources=read_raw_resources,
             track_index=track_index,
+            remove_translatable=remove_translatable,
             dir_names=dir_names,
         )
         resource_map.add_many(resources)
@@ -361,6 +373,7 @@ def get_target_package_resources(
         parse_all_values=parse_all_values,
         read_raw_resources=False,
         track_index=True,
+        remove_translatable=False,
         dir_names=dir_names,
     )
     return resource_map
@@ -629,6 +642,7 @@ def fixup_resource_attrib(
 
     assign_attrib('type')
     assign_attrib('format')
+    assign_attrib(TRANSLATABLE_KEY)
 
     return tag, attrib
 
@@ -898,6 +912,7 @@ def write_raw_resource(
 def read_xml_resources_prefix(
     all_resources: ResourceMap,
     output_path: str,
+    resources_dir: str,
     extra_paths: List[str],
 ):
     rel_xml_paths: Set[str] = set()
@@ -906,15 +921,12 @@ def read_xml_resources_prefix(
         if not is_by_rel_path_xml_resources(resources):
             continue
 
-        rel_xml_paths.add(rel_path)
+        rel_xml_paths.add(path.join(resources_dir, rel_path))
 
     rel_xml_paths.update(extra_paths)
 
     preserved_prefixes: Dict[str, bytes] = {}
     for rel_xml_path in rel_xml_paths:
-        if rel_xml_path in preserved_prefixes:
-            continue
-
         existing_xml_path = path.join(output_path, rel_xml_path)
 
         preserved = xml_read_prefix_before_tag(existing_xml_path, 'resources')

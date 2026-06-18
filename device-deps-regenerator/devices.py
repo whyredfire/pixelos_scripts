@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2017-2025 The LineageOS Project
+# SPDX-FileCopyrightText: The LineageOS Project
 # SPDX-License-Identifier: Apache-2.0
 
 import json
@@ -19,6 +19,8 @@ ignorelist = [
     "gs101",
     "gs201",
     "kernels",
+    "laguna",
+    "muzel",
     "pantah",
     "raviole",
     "redbull",

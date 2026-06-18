@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: The LineageOS Project
+# SPDX-License-Identifier: Apache-2.0
+
 from pathlib import Path
 from typing import List, NotRequired, TypedDict, cast
 
@@ -41,6 +44,6 @@ def parse_bp_rro_module(android_bp_path: Path):
         )
     )
 
-    assert len(statements) == 1
+    assert len(statements) == 1, android_bp_path
 
     return cast(RROModule, statements[0])

@@ -1,14 +1,21 @@
 #!/usr/bin/env python3
+
+# SPDX-FileCopyrightText: The LineageOS Project
+# SPDX-License-Identifier: Apache-2.0
+
 import os
 import sys
 import subprocess
+import argparse
 
-def find_module_path(build_dir, module_name):
-    """Search for a .ko file under build_dir matching module_name."""
+def build_module_index(build_dir):
+    """Build a mapping from module filename to full path."""
+    module_index = {}
     for root, _, files in os.walk(build_dir):
-        if module_name in files:
-            return os.path.join(root, module_name)
-    return None
+        for f in files:
+            if f.endswith(".ko"):
+                module_index[f] = os.path.join(root, f)
+    return module_index
 
 def get_module_dependencies(mod_path):
     """Return a list of dependencies for the given module using modinfo."""
@@ -25,8 +32,7 @@ def get_module_dependencies(mod_path):
         sys.stderr.write(f"Warning: failed to get dependencies for {mod_path}: {e}\n")
         return []
 
-def collect_all_dependencies(build_dir, module_name, visited=None):
-    """Recursively collect all dependencies for the given module."""
+def collect_all_dependencies(module_index, module_name, visited=None):
     if visited is None:
         visited = set()
 
@@ -40,56 +46,70 @@ def collect_all_dependencies(build_dir, module_name, visited=None):
     if module_name in visited:
         return visited
 
-    mod_path = find_module_path(build_dir, module_name)
+    mod_path = module_index.get(module_name)
     if not mod_path:
-        sys.stderr.write(f"Warning: module {module_name} not found in {build_dir}\n")
+        sys.stderr.write(f"Warning: module {module_name} not found\n")
         return visited
 
     visited.add(module_name)
 
     for dep in get_module_dependencies(mod_path):
         dep_name = dep.strip()
-        if dep_name and not dep_name.endswith(".ko"):
-            dep_name += ".ko"
-        collect_all_dependencies(build_dir, dep_name, visited)
+        if dep_name:
+            if not dep_name.endswith(".ko"):
+                dep_name += ".ko"
+            collect_all_dependencies(module_index, dep_name, visited)
 
     return visited
 
-
 def main():
-    if len(sys.argv) != 2:
-        print(f"Usage: {sys.argv[0]} <kernel_build_output_dir>", file=sys.stderr)
+    parser = argparse.ArgumentParser(description="Collect kernel module dependencies.")
+    parser.add_argument("build_dir", help="Kernel build output directory")
+    parser.add_argument("modules", nargs="*", help="Module names (used only with --non-interactive)")
+    parser.add_argument("--non-interactive", action="store_true", help="Get input from params and suppress UI text")
+
+    args = parser.parse_args()
+
+    if not os.path.isdir(args.build_dir):
+        print(f"Error: {args.build_dir} is not a valid directory.", file=sys.stderr)
         sys.exit(1)
 
-    build_dir = sys.argv[1]
-    if not os.path.isdir(build_dir):
-        print(f"Error: {build_dir} is not a valid directory.", file=sys.stderr)
-        sys.exit(1)
+    input_modules = []
 
-    modules = []
-    print("Enter module names (one per line). End with Ctrl+D (Linux/macOS) or Ctrl+Z (Windows):", file=sys.stderr)
-    for line in sys.stdin:
-        line = line.strip()
-        if not line or line.startswith("#"):
-            continue
-        modules.append(line)
+    if args.non_interactive:
+        # Get modules from the command line arguments
+        input_modules = [m for m in args.modules if m and not m.startswith("#")]
+    else:
+        # Interactive mode: Get modules from stdin
+        print("Enter module names (one per line). End with Ctrl+D (Linux/macOS) or Ctrl+Z (Windows):", file=sys.stderr)
+        for line in sys.stdin:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            input_modules.append(line)
 
-    print("\n--- End of input. Processing dependencies... ---\n", file=sys.stderr)
+        if not args.non_interactive:
+            print("\n--- End of input. Processing dependencies... ---\n", file=sys.stderr)
+
+    module_index = build_module_index(args.build_dir)
 
     all_deps = set()
-    for mod in modules:
-        all_deps |= collect_all_dependencies(build_dir, mod)
+    for mod in input_modules:
+        all_deps |= collect_all_dependencies(module_index, mod)
 
-    # Normalize input module names (with .ko suffix)
-    input_mods = set(m if m.endswith(".ko") else m + ".ko" for m in modules)
+    # Normalize input module names (with .ko suffix) for subtraction
+    input_mods_normalized = set(m if m.endswith(".ko") else m + ".ko" for m in input_modules)
 
     # Remove original modules from dependency set
-    result_mods = sorted(all_deps - input_mods)
+    result_mods = sorted(all_deps - input_mods_normalized)
 
-    print("\n--- Dependency modules ---\n", file=sys.stderr)
+    # Header is only printed in interactive mode
+    if not args.non_interactive:
+        print("\n--- Dependency modules ---\n", file=sys.stderr)
+
+    # Print the resulting module names
     for mod in result_mods:
         print(mod)
-
 
 if __name__ == "__main__":
     main()
